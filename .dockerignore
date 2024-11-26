@@ -1,0 +1,11 @@
+.cache
+.git
+.vscode
+build
+.clang-format
+.dockerignore
+.editorconfig
+.gitignore
+Dockerfile
+LICENSE
+README.md
