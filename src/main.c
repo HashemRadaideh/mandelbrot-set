@@ -10,13 +10,15 @@ char* title = "Mandelbrot Set";
 const int screenWidth = 800;
 const int screenHeight = 800;
 
+double zoomFactor = 1.0;
+Vector2 dragStart = {0, 0};
+bool isDragging = false;
+
 double realMin = -2.0, realMax = 1.0, imagMin = -1.5, imagMax = 1.5;
 const size_t maxIter = 50;
 int* grid;
 
-double zoomFactor = 1.0;
-Vector2 dragStart = {0, 0};
-bool isDragging = false;
+double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
 
 void setup() {
   InitWindow(screenWidth, screenHeight, title);
@@ -71,9 +73,23 @@ void handleInput() {
   }
 }
 
-void update() {
+void updateMandelbrotSet() {
+  if (prevRealMin == realMin && prevRealMax == realMax &&
+      prevImagMin == imagMin && prevImagMax == imagMax) {
+    return;
+  }
+
   mandelbrotSet(realMin, realMax, imagMin, imagMax, GetScreenWidth(),
                 GetScreenHeight(), maxIter, grid);
+
+  prevRealMin = realMin;
+  prevRealMax = realMax;
+  prevImagMin = imagMin;
+  prevImagMax = imagMax;
+}
+
+void update() {
+  updateMandelbrotSet();
 
   for (int i = 0; i < GetScreenHeight() * GetScreenWidth(); ++i) {
     size_t iter = grid[i];
@@ -94,8 +110,8 @@ void clean() {
 int main(int argc, char* argv[]) {
   setup();
   while (!WindowShouldClose()) {
-    BeginDrawing();
     handleInput();
+    BeginDrawing();
     update();
     EndDrawing();
   }
