@@ -1,9 +1,13 @@
+#include <raylib.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include "complex.h"
 
-Complex mandelbrot(Complex c, size_t maxIter) {
+#define pixelColor(p) \
+  p == maxIter ? BLACK : (Color){p * 5 % 256, p * 3 % 256, 255 - p % 256, 255}
+
+Color mandelbrot(Complex c, size_t maxIter) {
   Complex z = {0, 0};
   size_t iter = 0;
 
@@ -11,21 +15,21 @@ Complex mandelbrot(Complex c, size_t maxIter) {
     z = compAdd(compMul(z, z), c);
   }
 
-  return (Complex){.Real = iter, .Imag = 0.0};
+  return pixelColor(iter);
 }
 
 void mandelbrotSet(double realMin, double realMax, double imagMin,
                    double imagMax, size_t width, size_t height, size_t maxIter,
-                   int* grid) {
-  double realStep = (realMax - realMin) / (width - 1);
-  double imagStep = (imagMax - imagMin) / (height - 1);
+                   Color* grid) {
+  const double realStep = (realMax - realMin) / (width - 1);
+  const double imagStep = (imagMax - imagMin) / (height - 1);
 
   double imag = imagMax - 0 * imagStep;
   double real = realMin + 0 * realStep;
 
   for (size_t i = 0; i < height; ++i) {
     for (size_t j = 0; j < width; ++j) {
-      grid[i * width + j] = mandelbrot((Complex){real, imag}, maxIter).Real;
+      grid[i * width + j] = mandelbrot((Complex){real, imag}, maxIter);
 
       real = realMin + j * realStep;
     }

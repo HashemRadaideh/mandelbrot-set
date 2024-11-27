@@ -6,65 +6,65 @@
 
 #include "mandelbrot.h"
 
-char* title = "Mandelbrot Set";
-const int screenWidth = 800;
-const int screenHeight = 800;
+static const char* title = "Mandelbrot Set";
+static const int screenWidth = 800;
+static const int screenHeight = 800;
 
-double zoomFactor = 1.0;
-Vector2 dragStart = {0, 0};
-bool isDragging = false;
-
+static const size_t maxIter = 50;
 double realMin = -2.0, realMax = 1.0, imagMin = -1.5, imagMax = 1.5;
-const size_t maxIter = 50;
-int* grid;
 
 double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
+
+Texture2D mandelbrotTexture;
+Image mandelbrotImage;
 
 void setup() {
   InitWindow(screenWidth, screenHeight, title);
   SetTargetFPS(60);
-  ClearBackground(BLACK);
 
-  grid = malloc(GetScreenHeight() * GetScreenWidth() * sizeof(int*));
+  mandelbrotImage = GenImageColor(screenWidth, screenHeight, BLACK);
+  mandelbrotTexture = LoadTextureFromImage(mandelbrotImage);
 }
 
-void handleInput() {
-  float scroll = GetMouseWheelMove();
-  if (scroll != 0) {
-    double realCenter = (realMin + realMax) / 2.0;
-    double imagCenter = (imagMin + imagMax) / 2.0;
-    double realRange = (realMax - realMin) * 0.5;
-    double imagRange = (imagMax - imagMin) * 0.5;
+void handleZoom() {
+  const float scroll = GetMouseWheelMove();
 
-    if (scroll > 0) {
-      realRange *= 0.9;
-      imagRange *= 0.9;
-    } else {
-      realRange *= 1.1;
-      imagRange *= 1.1;
-    }
+  if (scroll != 0) {
+    const double realCenter = (realMin + realMax) / 2.0;
+    const double imagCenter = (imagMin + imagMax) / 2.0;
+
+    const double rangeFactor = (scroll > 0) ? 0.9 : 1.1;
+
+    const double realRange = (realMax - realMin) * rangeFactor / 2.0;
+    const double imagRange = (imagMax - imagMin) * rangeFactor / 2.0;
 
     realMin = realCenter - realRange;
     realMax = realCenter + realRange;
     imagMin = imagCenter - imagRange;
     imagMax = imagCenter + imagRange;
   }
+}
+
+void handleDrag() {
+  static Vector2 dragStart = {0, 0};
+  static bool isDragging = false;
 
   if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-    Vector2 currentMousePos = GetMousePosition();
+    const Vector2 currentMousePos = GetMousePosition();
+
     if (!isDragging) {
       dragStart = currentMousePos;
       isDragging = true;
     } else {
-      Vector2 dragDelta = Vector2Subtract(dragStart, currentMousePos);
+      const Vector2 dragDelta = Vector2Subtract(dragStart, currentMousePos);
 
-      double realRange = realMax - realMin;
-      double imagRange = imagMax - imagMin;
+      const double realRange = realMax - realMin;
+      const double imagRange = imagMax - imagMin;
 
-      realMin += (dragDelta.x / GetScreenWidth()) * realRange;
-      realMax += (dragDelta.x / GetScreenWidth()) * realRange;
-      imagMin -= (dragDelta.y / GetScreenHeight()) * imagRange;
-      imagMax -= (dragDelta.y / GetScreenHeight()) * imagRange;
+      realMin += (dragDelta.x / screenWidth) * realRange;
+      realMax += (dragDelta.x / screenWidth) * realRange;
+      imagMin -= (dragDelta.y / screenHeight) * imagRange;
+      imagMax -= (dragDelta.y / screenHeight) * imagRange;
 
       dragStart = currentMousePos;
     }
@@ -73,37 +73,39 @@ void handleInput() {
   }
 }
 
+void handleInput() {
+  handleZoom();
+
+  handleDrag();
+}
+
 void updateMandelbrotSet() {
   if (prevRealMin == realMin && prevRealMax == realMax &&
       prevImagMin == imagMin && prevImagMax == imagMax) {
     return;
   }
 
-  mandelbrotSet(realMin, realMax, imagMin, imagMax, GetScreenWidth(),
-                GetScreenHeight(), maxIter, grid);
-
   prevRealMin = realMin;
   prevRealMax = realMax;
   prevImagMin = imagMin;
   prevImagMax = imagMax;
+
+  mandelbrotSet(realMin, realMax, imagMin, imagMax, screenWidth, screenHeight,
+                maxIter, mandelbrotImage.data);
+
+  UpdateTexture(mandelbrotTexture, mandelbrotImage.data);
 }
 
 void update() {
   updateMandelbrotSet();
 
-  for (int i = 0; i < GetScreenHeight() * GetScreenWidth(); ++i) {
-    size_t iter = grid[i];
-
-    Color color = iter == maxIter ? BLACK
-                                  : (Color){iter * 4 % 256, iter * 2 % 256,
-                                            255 - iter % 256, 255};
-
-    DrawPixel(i % GetScreenWidth(), i / GetScreenHeight(), color);
-  }
+  DrawTexture(mandelbrotTexture, 0, 0, WHITE);
 }
 
 void clean() {
-  free(grid);
+  UnloadTexture(mandelbrotTexture);
+  UnloadImage(mandelbrotImage);
+
   CloseWindow();
 }
 
@@ -112,6 +114,7 @@ int main(int argc, char* argv[]) {
   while (!WindowShouldClose()) {
     handleInput();
     BeginDrawing();
+    ClearBackground(BLACK);
     update();
     EndDrawing();
   }
