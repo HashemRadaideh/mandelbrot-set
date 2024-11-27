@@ -1,23 +1,30 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "mandelbrot.h"
 
+#define ZOOM_IN_FACTOR 0.9
+#define ZOOM_OUT_FACTOR 1.1
+#define LOD 50
+#define MIN_LOD 10
+#define MAX_LOD 2000
+
 double realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
 double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
 
-Texture2D mandelbrotTexture;
-Image mandelbrotImage;
+double zoomLevel = 1;
+int lod = LOD;
 
-void setup(int* screenWidth, int* screenHeight) {
-  *screenWidth = GetScreenWidth();
-  *screenHeight = GetScreenHeight();
+Color* buffer = NULL;
+Texture2D texture;
 
-  const double aspectRatio = (double)*screenHeight / (double)*screenWidth;
+void setup(int* width, int* height) {
+  *width = GetScreenWidth();
+  *height = GetScreenHeight();
 
+  const double aspectRatio = (double)*height / (double)*width;
   const double realRange = realMax - realMin;
   const double imagCenter = (imagMin + imagMax) / 2.0;
   const double imagRange = realRange * aspectRatio;
@@ -25,67 +32,66 @@ void setup(int* screenWidth, int* screenHeight) {
   imagMin = imagCenter - imagRange / 2.0;
   imagMax = imagCenter + imagRange / 2.0;
 
-  mandelbrotImage = GenImageColor(*screenWidth, *screenHeight, BLANK);
-  mandelbrotTexture = LoadTextureFromImage(mandelbrotImage);
+  if (buffer) free(buffer);
+  buffer = malloc((*width) * (*height) * sizeof(Color));
+
+  if (IsTextureValid(texture)) UnloadTexture(texture);
+  texture = LoadTextureFromImage(GenImageColor(*width, *height, BLANK));
 }
 
-void handleZoom() {
-  const float scroll = GetMouseWheelMove();
+void handleZoom(const int width, const int height) {
+  float scroll = GetMouseWheelMove();
+  if (scroll == 0) return;
 
-  if (scroll == 0) {
-    return;
-  }
+  const double zoomFactor = (scroll > 0) ? ZOOM_IN_FACTOR : ZOOM_OUT_FACTOR;
+  zoomLevel = zoomLevel / zoomFactor > 0 ? zoomLevel / zoomFactor : zoomLevel;
 
   const double realCenter = (realMin + realMax) / 2.0;
   const double imagCenter = (imagMin + imagMax) / 2.0;
 
-  const double rangeFactor = (scroll > 0) ? 0.9 : 1.1;
-
-  const double realRange = (realMax - realMin) * rangeFactor / 2.0;
-  const double imagRange = (imagMax - imagMin) * rangeFactor / 2.0;
+  const double realRange = (realMax - realMin) * zoomFactor / 2.0;
+  const double imagRange = (imagMax - imagMin) * zoomFactor / 2.0;
 
   realMin = realCenter - realRange;
   realMax = realCenter + realRange;
   imagMin = imagCenter - imagRange;
   imagMax = imagCenter + imagRange;
+
+  lod = LOD + round(log10(zoomLevel) * (width + height) / 100);
+  lod = fmax(MIN_LOD, fmin(MAX_LOD, lod));
 }
 
-void handleDrag(const int screenWidth, const int screenHeight) {
+void handleDrag(const int width, const int height) {
   static Vector2 dragStart = {0, 0};
   static bool isDragging = false;
 
-  if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-    isDragging = false;
-    return;
-  }
-
-  const Vector2 currentMousePos = GetMousePosition();
-
-  if (!isDragging) {
-    dragStart = currentMousePos;
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    dragStart = GetMousePosition();
     isDragging = true;
-    return;
+  } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    isDragging = false;
   }
 
-  const Vector2 dragDelta = Vector2Subtract(dragStart, currentMousePos);
-  dragStart = currentMousePos;
+  if (!isDragging) return;
+
+  const Vector2 dragDelta = Vector2Subtract(dragStart, GetMousePosition());
+  dragStart = GetMousePosition();
 
   const double realRange = realMax - realMin;
   const double imagRange = imagMax - imagMin;
 
-  realMin += (dragDelta.x / screenWidth) * realRange;
-  realMax += (dragDelta.x / screenWidth) * realRange;
-  imagMin -= (dragDelta.y / screenHeight) * imagRange;
-  imagMax -= (dragDelta.y / screenHeight) * imagRange;
+  realMin += (dragDelta.x / width) * realRange;
+  realMax += (dragDelta.x / width) * realRange;
+  imagMin -= (dragDelta.y / height) * imagRange;
+  imagMax -= (dragDelta.y / height) * imagRange;
 }
 
-void handleInput(const int screenWidth, const int screenHeight) {
-  handleZoom();
-
-  handleDrag(screenWidth, screenHeight);
+void handleInput(const int width, const int height) {
+  handleZoom(width, height);
+  handleDrag(width, height);
 }
 
-void updateMandelbrotSet(const int screenWidth, const int screenHeight) {
+void updateMandelbrotSet(const int width, const int height) {
   if (prevRealMin == realMin && prevRealMax == realMax &&
       prevImagMin == imagMin && prevImagMax == imagMax) {
     return;
@@ -96,47 +102,42 @@ void updateMandelbrotSet(const int screenWidth, const int screenHeight) {
   prevImagMin = imagMin;
   prevImagMax = imagMax;
 
-  static const size_t maxIter = 50;
-
-  mandelbrotSet(realMin, realMax, imagMin, imagMax, screenWidth, screenHeight,
-                maxIter, mandelbrotImage.data);
-
-  UpdateTexture(mandelbrotTexture, mandelbrotImage.data);
+  mandelbrotSet(realMin, realMax, imagMin, imagMax, width, height, lod, buffer);
+  UpdateTexture(texture, buffer);
 }
 
-void update(const int screenWidth, const int screenHeight) {
-  updateMandelbrotSet(screenWidth, screenHeight);
-  DrawTexture(mandelbrotTexture, 0, 0, WHITE);
+void update(const int width, const int height) {
+  updateMandelbrotSet(width, height);
+  DrawTexture(texture, 0, 0, WHITE);
 }
 
 void clean() {
-  UnloadTexture(mandelbrotTexture);
-  UnloadImage(mandelbrotImage);
+  UnloadTexture(texture);
+  free(buffer);
 }
 
 int main() {
   static const char* title = "Mandelbrot Set";
-  static int screenWidth = 800;
-  static int screenHeight = 600;
+  static int width = 800, height = 600;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  InitWindow(screenWidth, screenHeight, title);
+  InitWindow(width, height, title);
   SetTargetFPS(60);
 
-  setup(&screenWidth, &screenHeight);
+  setup(&width, &height);
   while (!WindowShouldClose()) {
     if (IsWindowResized()) {
-      clean();
-      setup(&screenWidth, &screenHeight);
+      setup(&width, &height);
     }
 
-    handleInput(screenWidth, screenHeight);
+    handleInput(width, height);
     BeginDrawing();
-    update(screenWidth, screenHeight);
+    ClearBackground(BLACK);
+    update(width, height);
     EndDrawing();
   }
-  clean();
 
+  clean();
   CloseWindow();
   return EXIT_SUCCESS;
 }

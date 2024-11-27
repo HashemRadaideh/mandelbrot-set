@@ -4,36 +4,30 @@
 
 #include "complex.h"
 
-#define pixelColor(p) \
-  p == maxIter ? BLACK : (Color){p * 5 % 256, p * 3 % 256, 255 - p % 256, 255}
+#define mapColor(p) \
+  p == LOD ? BLACK : (Color){p * 5 % 256, p * 3 % 256, 255 - p % 256, 255}
 
-Color mandelbrot(Complex c, size_t maxIter) {
+int mandelbrot(Complex c, int LOD) {
   Complex z = {0, 0};
-  size_t iter = 0;
+  int iter = 0;
 
-  for (iter = 0; compMagnitude(z) <= 2 && iter < maxIter; iter++) {
+  for (iter = 0; compMagnitude(z) <= 2 && iter < LOD; iter++) {
     z = compAdd(compMul(z, z), c);
   }
 
-  return pixelColor(iter);
+  return iter;
 }
 
 void mandelbrotSet(double realMin, double realMax, double imagMin,
-                   double imagMax, size_t width, size_t height, size_t maxIter,
-                   Color* grid) {
+                   double imagMax, size_t width, size_t height, int LOD,
+                   Color* buffer) {
   const double realStep = (realMax - realMin) / (width - 1);
   const double imagStep = (imagMax - imagMin) / (height - 1);
 
-  double imag = imagMax - 0 * imagStep;
-  double real = realMin + 0 * realStep;
+  for (size_t index = 0; index < height * width; ++index) {
+    double real = realMin + (index % width) * realStep;
+    double imag = imagMax - ((double)index / width) * imagStep;
 
-  for (size_t i = 0; i < height; ++i) {
-    for (size_t j = 0; j < width; ++j) {
-      grid[i * width + j] = mandelbrot((Complex){real, imag}, maxIter);
-
-      real = realMin + j * realStep;
-    }
-
-    imag = imagMax - i * imagStep;
+    buffer[index] = mapColor(mandelbrot((Complex){real, imag}, LOD));
   }
 }
