@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "mandelbrot.h"
@@ -15,12 +16,12 @@ double realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
 double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
 
 double zoomLevel = 1;
-int lod = LOD;
+uint64_t lod = LOD;
 
-Color* buffer = NULL;
+Color* pixels = NULL;
 Texture2D texture;
 
-void setup(int* width, int* height) {
+void setup(uint16_t* width, uint16_t* height) {
   *width = GetScreenWidth();
   *height = GetScreenHeight();
 
@@ -32,14 +33,14 @@ void setup(int* width, int* height) {
   imagMin = imagCenter - imagRange / 2.0;
   imagMax = imagCenter + imagRange / 2.0;
 
-  if (buffer) free(buffer);
-  buffer = malloc((*width) * (*height) * sizeof(Color));
+  if (pixels) free(pixels);
+  pixels = malloc((*width) * (*height) * sizeof(Color));
 
   if (IsTextureValid(texture)) UnloadTexture(texture);
   texture = LoadTextureFromImage(GenImageColor(*width, *height, BLANK));
 }
 
-void handleZoom(const int width, const int height) {
+void handleZoom(const uint16_t width, const uint16_t height) {
   float scroll = GetMouseWheelMove();
   if (scroll == 0) return;
 
@@ -61,7 +62,7 @@ void handleZoom(const int width, const int height) {
   lod = fmax(MIN_LOD, fmin(MAX_LOD, lod));
 }
 
-void handleDrag(const int width, const int height) {
+void handleDrag(const uint16_t width, const uint16_t height) {
   static Vector2 dragStart = {0, 0};
   static bool isDragging = false;
 
@@ -86,12 +87,12 @@ void handleDrag(const int width, const int height) {
   imagMax -= (dragDelta.y / height) * imagRange;
 }
 
-void handleInput(const int width, const int height) {
+void handleInput(const uint16_t width, const uint16_t height) {
   handleZoom(width, height);
   handleDrag(width, height);
 }
 
-void updateMandelbrotSet(const int width, const int height) {
+void updateSetTexture(const uint16_t width, const uint16_t height) {
   if (prevRealMin == realMin && prevRealMax == realMax &&
       prevImagMin == imagMin && prevImagMax == imagMax) {
     return;
@@ -102,23 +103,23 @@ void updateMandelbrotSet(const int width, const int height) {
   prevImagMin = imagMin;
   prevImagMax = imagMax;
 
-  mandelbrotSet(realMin, realMax, imagMin, imagMax, width, height, lod, buffer);
-  UpdateTexture(texture, buffer);
+  mandelbrotSet(realMin, realMax, imagMin, imagMax, width, height, lod, pixels);
+  UpdateTexture(texture, pixels);
 }
 
-void update(const int width, const int height) {
-  updateMandelbrotSet(width, height);
+void update(const uint16_t width, const uint16_t height) {
+  updateSetTexture(width, height);
   DrawTexture(texture, 0, 0, WHITE);
 }
 
 void clean() {
   UnloadTexture(texture);
-  free(buffer);
+  free(pixels);
 }
 
 int main() {
   static const char* title = "Mandelbrot Set";
-  static int width = 800, height = 600;
+  static uint16_t width = 0, height = 0;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(width, height, title);

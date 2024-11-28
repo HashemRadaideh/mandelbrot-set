@@ -1,17 +1,11 @@
 #include "complex.h"
 
-#include <math.h>
-
-Complex compMul(Complex left, Complex right) {
-  return (Complex){.Real = left.Real * right.Real - left.Imag * right.Imag,
-                   .Imag = left.Real * right.Imag + left.Imag * right.Real};
+inline Complex compMul(const Complex left, const Complex right) {
+  return (Complex){.real = left.real * right.real - left.imag * right.imag,
+                   .imag = left.real * right.imag + left.imag * right.real};
 }
 
-Complex compAdd(Complex left, Complex right) {
-  return (Complex){.Real = left.Real + right.Real,
-                   .Imag = left.Imag + right.Imag};
-}
-
-double compMagnitude(Complex c) {
-  return sqrt(c.Real * c.Real + c.Imag * c.Imag);
+inline Complex compAdd(const Complex left, const Complex right) {
+  return (Complex){.real = left.real + right.real,
+                   .imag = left.imag + right.imag};
 }

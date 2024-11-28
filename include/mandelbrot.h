@@ -1,7 +1,7 @@
 #pragma once
 
 #include <raylib.h>
-#include <stdlib.h>
+#include <stdint.h>
 
-void mandelbrotSet(double, double, double, double, size_t, size_t, size_t,
-                   Color *);
+void mandelbrotSet(const double, const double, const double, const double,
+                   const uint16_t, const uint16_t, const uint64_t, Color*);

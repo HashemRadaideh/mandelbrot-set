@@ -1,10 +1,9 @@
 #pragma once
 
 typedef struct {
-  double Real;
-  double Imag;
+  double real;
+  double imag;
 } Complex;
 
-Complex compMul(Complex, Complex);
-Complex compAdd(Complex, Complex);
-double compMagnitude(Complex);
+Complex compMul(const Complex, const Complex);
+Complex compAdd(const Complex, const Complex);
