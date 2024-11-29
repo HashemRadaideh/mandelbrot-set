@@ -8,14 +8,14 @@
 #define ZOOM_OUT_FACTOR 1.1
 #define LOD 50
 #define MIN_LOD 10
-#define MAX_LOD 2000
+#define MAX_LOD 5000
 
 uint16_t width = 0, height = 0;
 
-float realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
-float prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
+double realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
+double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
 
-float zoomLevel = 1;
+double zoomLevel = 1;
 uint64_t lod = LOD;
 
 Color* pixels = NULL;
@@ -28,10 +28,10 @@ void initialize(uint16_t* width, uint16_t* height) {
   *width = GetScreenWidth();
   *height = GetScreenHeight();
 
-  const float aspectRatio = (float)*height / (float)*width;
-  const float realRange = realMax - realMin;
-  const float imagRange = realRange * aspectRatio;
-  const float imagCenter = (imagMin + imagMax) / 2.0;
+  const double aspectRatio = (double)*height / (double)*width;
+  const double realRange = realMax - realMin;
+  const double imagRange = realRange * aspectRatio;
+  const double imagCenter = (imagMin + imagMax) / 2.0;
 
   imagMin = imagCenter - imagRange / 2.0;
   imagMax = imagCenter + imagRange / 2.0;
@@ -43,62 +43,12 @@ void initialize(uint16_t* width, uint16_t* height) {
   texture = LoadTextureFromImage(GenImageColor(*width, *height, BLANK));
 }
 
-void handleZoom() {
-  float scroll = GetMouseWheelMove();
-  if (scroll == 0) return;
+uint64_t mandelbrot(const double real, const double imag) {
+  double zReal = real;
+  double zImag = imag;
 
-  const float zoomFactor = (scroll > 0) ? ZOOM_IN_FACTOR : ZOOM_OUT_FACTOR;
-  zoomLevel = zoomLevel / zoomFactor > 0 ? zoomLevel / zoomFactor : zoomLevel;
-
-  const float realCenter = (realMin + realMax) / 2.0;
-  const float imagCenter = (imagMin + imagMax) / 2.0;
-
-  const float realRange = (realMax - realMin) * zoomFactor / 2.0;
-  const float imagRange = (imagMax - imagMin) * zoomFactor / 2.0;
-
-  realMin = realCenter - realRange;
-  realMax = realCenter + realRange;
-  imagMin = imagCenter - imagRange;
-  imagMax = imagCenter + imagRange;
-
-  lod = LOD + (log10(zoomLevel) * (width + height) / 100);
-  lod = fmax(MIN_LOD, fmin(MAX_LOD, lod));
-}
-
-void handleDrag() {
-  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-    dragStart = GetMousePosition();
-    isDragging = true;
-  } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-    isDragging = false;
-  }
-
-  if (!isDragging) return;
-
-  const Vector2 dragDelta = Vector2Subtract(GetMousePosition(), dragStart);
-  dragStart = GetMousePosition();
-
-  const float realRange = realMax - realMin;
-  const float imagRange = imagMax - imagMin;
-
-  const float realOffset = (dragDelta.x / width) * realRange;
-  const float imagOffset = (dragDelta.y / height) * imagRange;
-
-  const float realCenter = (realMin + realMax) / 2.0 - realOffset;
-  const float imagCenter = (imagMin + imagMax) / 2.0 + imagOffset;
-
-  realMin = realCenter - realRange / 2.0;
-  realMax = realCenter + realRange / 2.0;
-  imagMin = imagCenter - imagRange / 2.0;
-  imagMax = imagCenter + imagRange / 2.0;
-}
-
-inline uint64_t mandelbrot(float real, float imag) {
-  float zReal = real;
-  float zImag = imag;
-
-  float zReal2 = zReal * zReal;
-  float zImag2 = zImag * zImag;
+  double zReal2 = zReal * zReal;
+  double zImag2 = zImag * zImag;
 
   uint64_t iter = 0;
   for (iter = 0; zReal2 + zImag2 <= lod && iter < lod; iter++) {
@@ -112,29 +62,62 @@ inline uint64_t mandelbrot(float real, float imag) {
   return iter;
 }
 
-Color mapColor(uint64_t iter) {
-  return (Color){(iter * 5) & 255, (iter * 3) & 255, (255 - iter) & 255, 255};
+Color mapColor(const int iter) {
+  const double l = 400.0 + 300.0 * iter / lod;
+  double r = 0.0, g = 0.0, b = 0.0, t = 0.0;
+
+  if ((l >= 400.0) && (l < 410.0)) {
+    t = (l - 400.0) / (410.0 - 400.0);
+    r = +(0.33 * t) - (0.20 * t * t);
+  } else if ((l >= 410.0) && (l < 475.0)) {
+    t = (l - 410.0) / (475.0 - 410.0);
+    r = 0.14 - (0.13 * t * t);
+  } else if ((l >= 545.0) && (l < 595.0)) {
+    t = (l - 545.0) / (595.0 - 545.0);
+    r = +(1.98 * t) - (t * t);
+  } else if ((l >= 595.0) && (l < 650.0)) {
+    t = (l - 595.0) / (650.0 - 595.0);
+    r = 0.98 + (0.06 * t) - (0.40 * t * t);
+  } else if ((l >= 650.0) && (l < 700.0)) {
+    t = (l - 650.0) / (700.0 - 650.0);
+    r = 0.65 - (0.84 * t) + (0.20 * t * t);
+  }
+
+  if ((l >= 415.0) && (l < 475.0)) {
+    t = (l - 415.0) / (475.0 - 415.0);
+    g = +(0.80 * t * t);
+  } else if ((l >= 475.0) && (l < 590.0)) {
+    t = (l - 475.0) / (590.0 - 475.0);
+    g = 0.8 + (0.76 * t) - (0.80 * t * t);
+  } else if ((l >= 585.0) && (l < 639.0)) {
+    t = (l - 585.0) / (639.0 - 585.0);
+    g = 0.84 - (0.84 * t);
+  }
+
+  if ((l >= 400.0) && (l < 475.0)) {
+    t = (l - 400.0) / (475.0 - 400.0);
+    b = +(2.20 * t) - (1.50 * t * t);
+  } else if ((l >= 475.0) && (l < 560.0)) {
+    t = (l - 475.0) / (560.0 - 475.0);
+    b = 0.7 - (t) + (0.30 * t * t);
+  }
+
+  return (Color){r * 255, g * 255, b * 255, 255};
 }
 
 void mandelbrotSet() {
-  const float imagStep = (imagMax - imagMin) / (height - 1);
-  float imagValues[height];
-  for (uint16_t y = 0; y < height; ++y) imagValues[y] = imagMax - y * imagStep;
-
-  const float realStep = (realMax - realMin) / (width - 1);
-  float realValues[width];
-  for (uint16_t x = 0; x < width; ++x) realValues[x] = realMin + x * realStep;
+  const double imagStep = (imagMax - imagMin) / (height - 1);
+  const double realStep = (realMax - realMin) / (width - 1);
 
   for (uint16_t y = 0; y < height; ++y) {
-    const float imag = imagValues[y];
+    const double imag = imagMax - y * imagStep;
 
     for (uint16_t x = 0; x < width; ++x) {
-      const float real = realValues[x];
+      const double real = realMin + x * realStep;
 
       uint64_t iter = mandelbrot(real, imag);
-      Color color = iter == lod ? BLACK : mapColor(iter);
 
-      pixels[y * width + x] = color;
+      pixels[y * width + x] = mapColor(iter);
     }
   }
 }
@@ -152,6 +135,56 @@ void updateSetTexture() {
 
   mandelbrotSet();
   UpdateTexture(texture, pixels);
+}
+
+void handleZoom() {
+  const double scroll = GetMouseWheelMove();
+  if (!scroll) return;
+
+  const double zoomFactor = scroll > 0 ? ZOOM_IN_FACTOR : ZOOM_OUT_FACTOR;
+  zoomLevel = zoomLevel / zoomFactor > 0 ? zoomLevel / zoomFactor : zoomLevel;
+
+  const double realCenter = (realMin + realMax) / 2.0;
+  const double imagCenter = (imagMin + imagMax) / 2.0;
+
+  const double realRange = (realMax - realMin) * zoomFactor / 2.0;
+  const double imagRange = (imagMax - imagMin) * zoomFactor / 2.0;
+
+  realMin = realCenter - realRange;
+  realMax = realCenter + realRange;
+  imagMin = imagCenter - imagRange;
+  imagMax = imagCenter + imagRange;
+
+  lod = LOD + (log10(zoomLevel) * 20);
+  lod = fmax(MIN_LOD, lod);
+}
+
+void handleDrag() {
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    dragStart = GetMousePosition();
+    isDragging = true;
+  } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    isDragging = false;
+  }
+
+  if (!isDragging) return;
+
+  const Vector2 dragDelta = Vector2Subtract(GetMousePosition(), dragStart);
+  dragStart = GetMousePosition();
+
+  const double realRange = realMax - realMin;
+  const double imagRange = imagMax - imagMin;
+
+  const double realOffset = (dragDelta.x / width) * realRange;
+  const double imagOffset = (dragDelta.y / height) * imagRange;
+
+  const double realCenter = (realMin + realMax) / 2.0 - realOffset;
+  const double imagCenter = (imagMin + imagMax) / 2.0 + imagOffset;
+
+  realMin = realCenter - realRange / 2.0;
+  realMax = realCenter + realRange / 2.0;
+  imagMin = imagCenter - imagRange / 2.0;
+  imagMax = imagCenter + imagRange / 2.0;
 }
 
 int main() {
