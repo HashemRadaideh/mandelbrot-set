@@ -29,7 +29,7 @@ add_executable(${NAME} ${SRC_FILES})
 
 target_include_directories(${NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries(${NAME} raylib m pthread dl)
+target_link_libraries(${NAME} raylib m)
 
 target_compile_options(
     ${NAME}

@@ -22,7 +22,7 @@ executable_target = executable(
   include_directories: include_directories('include'),
   dependencies: [raylib_dep],
   c_args: [release_c_args, debug_c_args],
-  link_args: ['-lm', '-pthread', '-ldl'],
+  link_args: ['-lm'],
 )
 
 run_target(

@@ -4,13 +4,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "mandelbrot.h"
-
 #define ZOOM_IN_FACTOR 0.9
 #define ZOOM_OUT_FACTOR 1.1
 #define LOD 50
 #define MIN_LOD 10
 #define MAX_LOD 2000
+
+uint16_t width = 0, height = 0;
 
 double realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
 double prevRealMin = 0, prevRealMax = 0, prevImagMin = 0, prevImagMax = 0;
@@ -40,7 +40,7 @@ void initialize(uint16_t* width, uint16_t* height) {
   texture = LoadTextureFromImage(GenImageColor(*width, *height, BLANK));
 }
 
-void handleZoom(const uint16_t width, const uint16_t height) {
+void handleZoom() {
   float scroll = GetMouseWheelMove();
   if (scroll == 0) return;
 
@@ -62,7 +62,7 @@ void handleZoom(const uint16_t width, const uint16_t height) {
   lod = fmax(MIN_LOD, fmin(MAX_LOD, lod));
 }
 
-void handleDrag(const uint16_t width, const uint16_t height) {
+void handleDrag() {
   static Vector2 dragStart = {0, 0};
   static bool isDragging = false;
 
@@ -87,7 +87,55 @@ void handleDrag(const uint16_t width, const uint16_t height) {
   imagMax -= (dragDelta.y / height) * imagRange;
 }
 
-void updateSetTexture(const uint16_t width, const uint16_t height) {
+inline uint64_t mandelbrot(double real, double imag) {
+  double zReal = real;
+  double zImag = imag;
+
+  double zReal2 = zReal * zReal;
+  double zImag2 = zImag * zImag;
+
+  uint64_t iter = 0;
+  for (iter = 0; zReal2 + zImag2 <= lod && iter < lod; iter++) {
+    zImag = 2 * zReal * zImag + imag;
+    zReal = zReal2 - zImag2 + real;
+
+    zReal2 = zReal * zReal;
+    zImag2 = zImag * zImag;
+  }
+
+  return iter;
+}
+
+Color mapColor(uint64_t iter) {
+  return (iter == lod) ? BLACK
+                       : (Color){(iter * 5) & 255, (iter * 3) & 255,
+                                 255 - (iter & 255), 255};
+}
+
+void mandelbrotSet() {
+  const double imagStep = (imagMax - imagMin) / (height - 1);
+  double imagValues[height];
+  for (uint16_t y = 0; y < height; ++y) imagValues[y] = imagMax - y * imagStep;
+
+  const double realStep = (realMax - realMin) / (width - 1);
+  double realValues[width];
+  for (uint16_t x = 0; x < width; ++x) realValues[x] = realMin + x * realStep;
+
+  for (uint16_t y = 0; y < height; ++y) {
+    const double imag = imagValues[y];
+
+    for (uint16_t x = 0; x < width; ++x) {
+      const double real = realValues[x];
+
+      uint64_t index = y * width + x;
+      uint64_t iter = mandelbrot(real, imag);
+
+      pixels[index] = mapColor(iter);
+    }
+  }
+}
+
+void updateSetTexture() {
   if (prevRealMin == realMin && prevRealMax == realMax &&
       prevImagMin == imagMin && prevImagMax == imagMax) {
     return;
@@ -98,16 +146,13 @@ void updateSetTexture(const uint16_t width, const uint16_t height) {
   prevImagMin = imagMin;
   prevImagMax = imagMax;
 
-  mandelbrotSet(realMin, realMax, imagMin, imagMax, width, height, lod, pixels);
+  mandelbrotSet();
   UpdateTexture(texture, pixels);
 }
 
 int main() {
-  static const char* title = "Mandelbrot Set";
-  static uint16_t width = 0, height = 0;
-
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  InitWindow(width, height, title);
+  InitWindow(width, height, "Mandelbrot Set");
   SetTargetFPS(60);
 
   initialize(&width, &height);
@@ -116,13 +161,13 @@ int main() {
       initialize(&width, &height);
     }
 
-    handleZoom(width, height);
-    handleDrag(width, height);
+    handleZoom();
+    handleDrag();
 
     BeginDrawing();
     ClearBackground(BLACK);
 
-    updateSetTexture(width, height);
+    updateSetTexture();
     DrawTexture(texture, 0, 0, WHITE);
     EndDrawing();
   }

@@ -13,7 +13,7 @@ MACROS   = -DVERSION=\"$(VERSION)\"
 
 # Includes and Libs
 INCS = -Iinclude/
-LIBS = -lm -lpthread -ldl -lraylib -lrt -lX11
+LIBS = -march=native -ffast-math -lm -lraylib
 
 # Define the build, source and include directories
 SRC_DIR = src
