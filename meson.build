@@ -11,6 +11,8 @@ src_files = files(
   'src/main.c',
 )
 
+link_args = ['-lm']
+
 release_c_args = ['-O3']
 debug_c_args = ['-g']
 
@@ -22,7 +24,7 @@ executable_target = executable(
   include_directories: include_directories('include'),
   dependencies: [raylib_dep],
   c_args: [release_c_args, debug_c_args],
-  link_args: ['-lm'],
+  link_args: link_args,
 )
 
 run_target(

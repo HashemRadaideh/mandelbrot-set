@@ -21,14 +21,17 @@ uint64_t lod = LOD;
 Color* pixels = NULL;
 Texture2D texture;
 
+Vector2 dragStart = {0, 0};
+bool isDragging = false;
+
 void initialize(uint16_t* width, uint16_t* height) {
   *width = GetScreenWidth();
   *height = GetScreenHeight();
 
   const float aspectRatio = (float)*height / (float)*width;
   const float realRange = realMax - realMin;
-  const float imagCenter = (imagMin + imagMax) / 2.0;
   const float imagRange = realRange * aspectRatio;
+  const float imagCenter = (imagMin + imagMax) / 2.0;
 
   imagMin = imagCenter - imagRange / 2.0;
   imagMax = imagCenter + imagRange / 2.0;
@@ -63,9 +66,6 @@ void handleZoom() {
 }
 
 void handleDrag() {
-  static Vector2 dragStart = {0, 0};
-  static bool isDragging = false;
-
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     dragStart = GetMousePosition();
     isDragging = true;
@@ -84,10 +84,13 @@ void handleDrag() {
   const float realOffset = (dragDelta.x / width) * realRange;
   const float imagOffset = (dragDelta.y / height) * imagRange;
 
-  realMin -= realOffset;
-  realMax -= realOffset;
-  imagMin += imagOffset;
-  imagMax += imagOffset;
+  const float realCenter = (realMin + realMax) / 2.0 - realOffset;
+  const float imagCenter = (imagMin + imagMax) / 2.0 + imagOffset;
+
+  realMin = realCenter - realRange / 2.0;
+  realMax = realCenter + realRange / 2.0;
+  imagMin = imagCenter - imagRange / 2.0;
+  imagMax = imagCenter + imagRange / 2.0;
 }
 
 inline uint64_t mandelbrot(float real, float imag) {
@@ -128,11 +131,10 @@ void mandelbrotSet() {
     for (uint16_t x = 0; x < width; ++x) {
       const float real = realValues[x];
 
-      uint64_t index = y * width + x;
       uint64_t iter = mandelbrot(real, imag);
       Color color = iter == lod ? BLACK : mapColor(iter);
 
-      pixels[index] = color;
+      pixels[y * width + x] = color;
     }
   }
 }
@@ -156,22 +158,21 @@ int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(width, height, "Mandelbrot Set");
   SetTargetFPS(60);
-
   initialize(&width, &height);
+
   while (!WindowShouldClose()) {
     if (IsWindowResized()) {
       initialize(&width, &height);
     }
 
-    handleZoom();
-    handleDrag();
-
     BeginDrawing();
     ClearBackground(BLACK);
-
     updateSetTexture();
     DrawTexture(texture, 0, 0, WHITE);
     EndDrawing();
+
+    handleZoom();
+    handleDrag();
   }
 
   UnloadTexture(texture);
