@@ -21,7 +21,7 @@ uint64_t lod = LOD;
 Color* pixels = NULL;
 Texture2D texture;
 
-void setup(uint16_t* width, uint16_t* height) {
+void initialize(uint16_t* width, uint16_t* height) {
   *width = GetScreenWidth();
   *height = GetScreenHeight();
 
@@ -58,7 +58,7 @@ void handleZoom(const uint16_t width, const uint16_t height) {
   imagMin = imagCenter - imagRange;
   imagMax = imagCenter + imagRange;
 
-  lod = LOD + round(log10(zoomLevel) * (width + height) / 100);
+  lod = LOD + (log10(zoomLevel) * (width + height) / 100);
   lod = fmax(MIN_LOD, fmin(MAX_LOD, lod));
 }
 
@@ -87,11 +87,6 @@ void handleDrag(const uint16_t width, const uint16_t height) {
   imagMax -= (dragDelta.y / height) * imagRange;
 }
 
-void handleInput(const uint16_t width, const uint16_t height) {
-  handleZoom(width, height);
-  handleDrag(width, height);
-}
-
 void updateSetTexture(const uint16_t width, const uint16_t height) {
   if (prevRealMin == realMin && prevRealMax == realMax &&
       prevImagMin == imagMin && prevImagMax == imagMax) {
@@ -107,16 +102,6 @@ void updateSetTexture(const uint16_t width, const uint16_t height) {
   UpdateTexture(texture, pixels);
 }
 
-void update(const uint16_t width, const uint16_t height) {
-  updateSetTexture(width, height);
-  DrawTexture(texture, 0, 0, WHITE);
-}
-
-void clean() {
-  UnloadTexture(texture);
-  free(pixels);
-}
-
 int main() {
   static const char* title = "Mandelbrot Set";
   static uint16_t width = 0, height = 0;
@@ -125,20 +110,25 @@ int main() {
   InitWindow(width, height, title);
   SetTargetFPS(60);
 
-  setup(&width, &height);
+  initialize(&width, &height);
   while (!WindowShouldClose()) {
     if (IsWindowResized()) {
-      setup(&width, &height);
+      initialize(&width, &height);
     }
 
-    handleInput(width, height);
+    handleZoom(width, height);
+    handleDrag(width, height);
+
     BeginDrawing();
     ClearBackground(BLACK);
-    update(width, height);
+
+    updateSetTexture(width, height);
+    DrawTexture(texture, 0, 0, WHITE);
     EndDrawing();
   }
 
-  clean();
+  UnloadTexture(texture);
+  free(pixels);
   CloseWindow();
   return EXIT_SUCCESS;
 }
