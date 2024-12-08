@@ -2,12 +2,13 @@
 #include <raymath.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define ZOOM_IN_FACTOR 0.9
 #define ZOOM_OUT_FACTOR 1.1
-#define LOD 50
-#define MIN_LOD 10
+#define MIN_LOD 50
+#define LOD 100
 #define MAX_LOD 5000
 
 uint16_t width = 0, height = 0;
@@ -67,7 +68,7 @@ void handleZoom() {
   imagMin = imagCenter - imagRange;
   imagMax = imagCenter + imagRange;
 
-  lod = fmax(MIN_LOD, fmin(MAX_LOD, LOD + (log10(zoomLevel) * 20)));
+  lod = fmax(MIN_LOD, fmin(MAX_LOD, LOD + (log10(zoomLevel) * MIN_LOD)));
 }
 
 void handleDrag() {
@@ -197,10 +198,74 @@ void generateTexture() {
   UpdateTexture(texture, pixels);
 }
 
+void telemetry() {
+  const int barWidth = 20;
+  const int barX = 10;
+  const int barHeight = height - 20;
+  const int barY = 10;
+
+  for (int i = 0; i < barHeight; i++) {
+    uint64_t paletteIndex = (i * lod) / barHeight;
+    if (paletteIndex >= lod) paletteIndex = lod - 1;
+
+    DrawRectangle(barX, barY + i, barWidth, 1, colorPalette[paletteIndex]);
+  }
+
+  DrawRectangleLines(barX, barY, barWidth, barHeight, WHITE);
+
+  const int textX = barX + barWidth + 10;
+  int textY = barY;
+
+  char fpsText[20];
+  sprintf(fpsText, "FPS: %d", GetFPS());
+  DrawText(fpsText, textX, textY, 20, GREEN);
+  textY += 30;
+
+  char renderTimeText[30];
+  sprintf(renderTimeText, "Render Time: %.2f ms", GetFrameTime() * 1000);
+  DrawText(renderTimeText, textX, textY, 20, RED);
+  textY += 30;
+
+  char windowSizeText[40];
+  sprintf(windowSizeText, "Resolution: %dx%d %f", width, height,
+          (float)width / height);
+  DrawText(windowSizeText, textX, textY, 20, GRAY);
+  textY += 30;
+
+  float dpiScale = GetWindowScaleDPI().x;
+  char dpiScaleText[30];
+  sprintf(dpiScaleText, "DPI Scale: %.2f", dpiScale);
+  DrawText(dpiScaleText, textX, textY, 20, GREEN);
+  textY += 30;
+
+  char lodText[20];
+  sprintf(lodText, "LOD: %lu", lod);
+  DrawText(lodText, textX, textY, 20, YELLOW);
+  textY += 30;
+
+  char zoomText[30];
+  sprintf(zoomText, "Zoom Level: %.2f", zoomLevel);
+  DrawText(zoomText, textX, textY, 20, LIME);
+  textY += 30;
+
+  char coordText[80];
+  sprintf(coordText, "Real: [%f, %f]\nImag: [%f, %f]", realMin, realMax,
+          imagMin, imagMax);
+  DrawText(coordText, textX, textY, 20, LIGHTGRAY);
+  textY += 50;
+
+  char dragOffsetText[50];
+  double realOffset = realMax - realMin;
+  double imagOffset = imagMax - imagMin;
+  sprintf(dragOffsetText, "Drag Offset: [%.6f, %.6f]", realOffset, imagOffset);
+  DrawText(dragOffsetText, textX, textY, 20, LIGHTGRAY);
+  textY += 30;
+}
+
 int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(width, height, "Mandelbrot Set");
-  SetTargetFPS(0);
+  SetTargetFPS(60);
   initialize(&width, &height);
 
   while (!WindowShouldClose()) {
@@ -216,7 +281,12 @@ int main() {
 
     BeginDrawing();
     ClearBackground(BLACK);
+    precomputeColor();
+    generateTexture();
     DrawTexture(texture, 0, 0, WHITE);
+    handleZoom();
+    handleDrag();
+    telemetry();
     EndDrawing();
   }
 
