@@ -28,6 +28,11 @@ Color* colorPalette = NULL;
 Color* pixels = NULL;
 Texture2D texture;
 
+bool isMenuOpen = false;
+
+Rectangle resetButton = {100, 200, 150, 50};
+Rectangle closeButton = {100, 300, 150, 50};
+
 void initialize(uint16_t* width, uint16_t* height) {
   *width = GetScreenWidth();
   *height = GetScreenHeight();
@@ -262,34 +267,104 @@ void telemetry() {
   textY += 30;
 }
 
+void ResetToDefault() {
+  realMin = -2.0, realMax = 2.0, imagMin = -1.5, imagMax = 1.5;
+  zoomLevel = 1;
+  lod = LOD;
+  initialize(&width, &height);
+}
+
+void handleMenu() {
+  Vector2 mousePosition = GetMousePosition();
+
+  if (CheckCollisionPointRec(mousePosition, closeButton) &&
+      IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    CloseWindow();
+  } else if (CheckCollisionPointRec(mousePosition, resetButton) &&
+             IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    ResetToDefault();
+    isMenuOpen = false;
+  }
+}
+
+Texture2D blurTexture;
+
+void openMenu() {
+  const int menuWidth = 400;
+  const int menuHeight = 300;
+
+  const int menuX = (GetScreenWidth() - menuWidth) / 2;
+  const int menuY = (GetScreenHeight() - menuHeight) / 2;
+
+  DrawTexture(blurTexture, 0, 0, Fade(BLACK, 0.5f));
+
+  DrawRectangle(menuX, menuY, menuWidth, menuHeight, Fade(BLACK, 0.9f));
+
+  DrawRectangleLines(menuX, menuY, menuWidth, menuHeight, RAYWHITE);
+
+  const int titleX = menuX + (menuWidth / 2) - MeasureText("Menu", 40) / 2;
+  const int titleY = menuY + 20;
+  DrawText("Menu", titleX, titleY, 40, RAYWHITE);
+
+  resetButton.x = menuX + (menuWidth / 2.0) - (resetButton.width / 2);
+  resetButton.y = menuY + 100;
+
+  closeButton.x = menuX + (menuWidth / 2.0) - (closeButton.width / 2);
+  closeButton.y = menuY + 200;
+
+  DrawRectangleRec(resetButton, DARKGRAY);
+  DrawText("Reset", resetButton.x + 20, resetButton.y + 10, 20, WHITE);
+
+  DrawRectangleRec(closeButton, DARKGRAY);
+  DrawText("Close", closeButton.x + 20, closeButton.y + 10, 20, WHITE);
+}
+
+void generateBlurOverlay(uint16_t width, uint16_t height) {
+  Image blurImage = GenImagePerlinNoise(width / 10, height / 10, 0, 0, 5.0f);
+  ImageResize(&blurImage, width, height);
+  blurTexture = LoadTextureFromImage(blurImage);
+  UnloadImage(blurImage);
+}
+
 int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(width, height, "Mandelbrot Set");
   SetTargetFPS(60);
+  SetExitKey(KEY_NULL);
   initialize(&width, &height);
+
+  generateBlurOverlay(GetScreenWidth(), GetScreenHeight());
 
   while (!WindowShouldClose()) {
     if (IsWindowResized()) {
       initialize(&width, &height);
+      generateBlurOverlay(GetScreenWidth(), GetScreenHeight());
     }
 
-    handleZoom();
-    handleDrag();
-
-    precomputeColor();
-    generateTexture();
+    if (IsKeyPressed(KEY_ESCAPE)) {
+      isMenuOpen = !isMenuOpen;
+    }
 
     BeginDrawing();
     ClearBackground(BLACK);
+
     precomputeColor();
     generateTexture();
     DrawTexture(texture, 0, 0, WHITE);
-    handleZoom();
-    handleDrag();
-    telemetry();
+
+    if (isMenuOpen) {
+      handleMenu();
+      openMenu();
+    } else {
+      handleZoom();
+      handleDrag();
+      telemetry();
+    }
+
     EndDrawing();
   }
 
+  UnloadTexture(blurTexture);
   UnloadTexture(texture);
   free(pixels);
   free(colorPalette);
